@@ -12,7 +12,10 @@ class Const:
     PGDB = 'tinyco'
     SYMBOL_DEFAULT = (
         ('GOLD', 5), ('GOLD', 15), ('GOLD', 30), ('GOLD', 60),
-        # ('GOLD', 60),
+        ('GOLD.FUT', 15), ('GOLD.FUT', 30), ('GOLD.FUT', 60),
+        ('OIL.WTI', 15), ('OIL.WTI', 30), ('OIL.WTI', 60),
+        ('USDJPY', 15), ('USDJPY', 30), ('USDJPY', 60),
+        ('EURUSD', 15), ('EURUSD', 30), ('EURUSD', 60),
     )
     SYMBOL_SUBSCRIBE = (
         ('GOLD', 240),
