@@ -42,7 +42,7 @@ class Loggers:
         self.logging = logging.getLogger(name=self.name)
         self.logging.setLevel(logging.DEBUG)
         self.logging.addHandler(_get_file_handler(name=self.app))
-        self.logging.addHandler(_get_loki_handler())
+        # self.logging.addHandler(_get_loki_handler())
 
     def _log(self, level=logging.DEBUG, message='') -> None:
         levelname: str = logging.getLevelName(level)

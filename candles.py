@@ -112,7 +112,7 @@ def collect() -> None:
 
     # Collect candles
     task = CandlesTask(dbs=dbs, broker=broker)
-    for symbol_period in Const.SYMBOL_SUBSCRIBE:
+    for symbol_period in Const.SYMBOL_DEFAULT:
         symbol, period = symbol_period
         task.collect(
             symbol=symbol,
