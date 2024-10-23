@@ -3,8 +3,9 @@ import psycopg2
 from typing import List, Dict, Any
 from psycopg2.extras import execute_values
 from psycopg2 import OperationalError
-from loguru import logger
-from decorators import timer
+# from decorators import timer
+from base_loggers import logger
+logger.service = __name__
 
 
 class Postgres:
@@ -29,14 +30,12 @@ class Postgres:
         if self.db:
             self.db.close()
 
-    @timer
     def fetch_many(self, table: str, limit: int) -> List:
         with self.db.cursor() as cursor:
             cursor.execute("SELECT * FROM %s;" % table)
             res: List = cursor.fetchmany(limit)
         return res
 
-    @timer
     def upsert_many(self, table, data, page_size: int = 1000) -> int:
         with self.db.cursor() as cursor:
             execute_values(

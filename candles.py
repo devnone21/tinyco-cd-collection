@@ -2,7 +2,8 @@ from initials import Const
 from connections import BrokerConnection, DBConnections
 from datetime import datetime, date, time, timedelta, timezone
 from time import sleep
-from loguru import logger
+from base_loggers import logger
+logger.service = __name__
 
 
 class CandlesTime:
@@ -39,38 +40,36 @@ class CandlesTask:
         self.dbs = dbs
         self.broker = broker
 
-    def gather_present_candles(self, ct: CandlesTime):
-        # get present charts
+    def _get_chart_from_ts(self, ts:int, symbol: str, timeframe: int, tick: int):
         bkr_client = self.broker.client
-        ts = int(datetime.now(timezone.utc).timestamp())
-        res = bkr_client.get_chart_range_request(ct.symbol, ct.timeframe, ts, ts, -100) if bkr_client else {}
+        res = bkr_client.get_chart_range_request(symbol, timeframe, ts, ts, tick) if bkr_client else {}
         candles = res.get('rateInfos', [])
-        logger.info(f'recv {ct.symbol}_{ct.timeframe} {len(candles)} ticks.')
+        # digits = res.get('digits', 0)
+        logger.info(f'Got {symbol}_{timeframe} {len(candles)} ticks from {ts}')
         return candles
 
-    def gather_backdate_candles(self, ct: CandlesTime):
-        # get backdate charts
-        bkr_client = self.broker.client
-        if ct.max_backdate < ct.last_backdate:
-            sleep(0.5)
-            ts = int(datetime.combine(ct.last_backdate, time(0, 0)).timestamp())
-            res = bkr_client.get_chart_range_request(ct.symbol, ct.timeframe, ts, ts, -500) if bkr_client else {}
-            candles = res.get('rateInfos', [])
-            min_ts = min([int(c['ctm']) for c in candles]) / 1000
-            logger.info(f'recv {ct.symbol}_{ct.timeframe} {len(candles)} backdate ticks.')
-            return int(min_ts), candles
-        return 0, []
+    def gather_present_candles(self, ct: CandlesTime):
+        """get present charts"""
+        ts = int(datetime.now(timezone.utc).timestamp())
+        return self._get_chart_from_ts(ts, ct.symbol, ct.timeframe, tick=-300)
+
+    def gather_olden_candles(self, ct: CandlesTime):
+        """get olden charts"""
+        if ct.max_backdate >= ct.last_backdate:
+            return []
+        sleep(0.5)
+        ts = int(datetime.combine(ct.last_backdate, time(0, 0)).timestamp())
+        return self._get_chart_from_ts(ts, ct.symbol, ct.timeframe, tick=-500)
 
     def collect(self, symbol: str, timeframe: int) -> None:
-        logger.debug(f'Init CandlesTime ({symbol}, {timeframe})')
+        logger.debug(f'Initialize CandlesTime ({symbol}, {timeframe})')
         ct = CandlesTime(self.dbs, symbol, timeframe)
         ct.query()
 
         # gather candles
         candles = self.gather_present_candles(ct)
-        min_ts, _backdate_candles = self.gather_backdate_candles(ct)
-        candles.extend(_backdate_candles)
-        # min_ts, candles = 0, []
+        olden_candles = self.gather_olden_candles(ct)
+        candles.extend(olden_candles)
 
         # return if no new candles
         if not candles:
@@ -78,22 +77,24 @@ class CandlesTask:
 
         # store new candles in Postgres
         pgdb = self.dbs.get_pg()
-        logger.debug(f'Get conn: {pgdb}')
+        logger.debug(f'Using Postgres conn: {pgdb}')
         symbol_id = Const.SYMBOL_ID.get(symbol)
         timeframe_id = Const.PERIOD_ID.get(timeframe)
         rowcount = pgdb.upsert_many_candles(symbol_id, timeframe_id, candles)
 
         # store new candles in Mongo
         mongodb = self.dbs.get_mongo()
-        logger.debug(f'Get conn: {mongodb}')
+        logger.debug(f'Using Mongo conn: {mongodb}')
         n_inserted = mongodb.insert_list_of_dict(
             collection=f'real_{symbol}_{timeframe}',
             data=[dict(d, **{'_id': d.get('ctm')}) for d in candles]
         )
         # update last backdate
-        if n_inserted >= 0 and min_ts > datetime(2020, 7, 1).timestamp():
-            ct.last_backdate = date.fromtimestamp(min_ts) + timedelta(days=1)
+        olden_ts = 0 if not olden_candles else min([int(c['ctm']) for c in olden_candles]) / 1000
+        if n_inserted >= 0 and olden_ts > datetime(2020, 7, 1).timestamp():
+            ct.last_backdate = date.fromtimestamp(olden_ts) + timedelta(days=1)
             ct.update()
+
         # summary
         logger.info(
             f'Collect {symbol}_{timeframe}: ' +
@@ -104,14 +105,14 @@ class CandlesTask:
 
 
 def collect() -> None:
-    logger.debug(f'Init BrokerConnection()')
+    logger.debug(f'Initialize BrokerConnection()')
     broker = BrokerConnection()
-    logger.debug(f'Init DBConnection()')
+    logger.debug(f'Initialize DBConnection()')
     dbs = DBConnections()
 
     # Collect candles
     task = CandlesTask(dbs=dbs, broker=broker)
-    for symbol_period in Const.SYMBOL_DEFAULT:
+    for symbol_period in Const.SYMBOL_SUBSCRIBE:
         symbol, period = symbol_period
         task.collect(
             symbol=symbol,

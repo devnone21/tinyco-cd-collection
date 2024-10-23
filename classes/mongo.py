@@ -1,8 +1,9 @@
 import os
 from pymongo import MongoClient
 from pymongo.errors import BulkWriteError
-from loguru import logger
-from decorators import timer
+# from decorators import timer
+from base_loggers import logger
+logger.service = __name__
 
 
 class Mongo:
@@ -21,17 +22,16 @@ class Mongo:
         if isinstance(self.client, MongoClient):
             self.client.close()
 
-    @timer
     def find_all(self, collection: str):
         try:
             db_collection = self.db[collection]
             with db_collection.find() as cursor:
                 res = [doc for doc in cursor]
                 if res:
-                    logger.debug(f'Mongo.{self.dbname}.{collection} found')
+                    logger.debug(f'Mongo.{self.dbname}.{collection}: found {len(res)} documents')
             return res
         except TypeError as err:
-            logger.error(err)
+            logger.error(str(err))
             return []
 
     def upsert_one(self, collection: str, match: dict, data: dict):
@@ -43,13 +43,12 @@ class Mongo:
                 upsert=True
             )
             n_upsert = res.modified_count
-            logger.debug(f'Mongo.{self.dbname}.{collection} upsert: {match}')
+            logger.debug(f'Mongo.{self.dbname}.{collection}: upsert {match}')
         except AttributeError as err:
-            logger.error(err)
+            logger.error(str(err))
         finally:
             return n_upsert
 
-    @timer
     def insert_list_of_dict(self, collection: str, data: list):
         n_inserted = -1
         try:
@@ -62,6 +61,6 @@ class Mongo:
             n_inserted = int(err.details.get('nInserted'))
             logger.debug(f'Mongo.{self.dbname}.{collection} nInserted: {n_inserted}, writeErrors: {n_errors}')
         except AttributeError as err:
-            logger.error(err)
+            logger.error(str(err))
         finally:
             return n_inserted

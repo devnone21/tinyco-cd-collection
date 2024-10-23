@@ -3,7 +3,8 @@ from XTBApi.api import Client as XTB
 from XTBApi.api import STATUS
 from XTBApi.exceptions import CommandFailed
 from classes import Postgres, Mongo
-from loguru import logger
+from base_loggers import logger
+logger.service = __name__
 
 # Get account information
 # profile = settings[0]
@@ -18,9 +19,9 @@ class BrokerConnection:
         try:
             self.client.login(user, secret, mode='real')
         except CommandFailed as e:
-            logger.error(f'Gate is blocked, {e}')
+            logger.error(f'Exchange command failed, {e}')
             return
-        logger.debug('Enter the Gate.')
+        logger.debug('Exchange login success')
 
     def get(self):
         if not self.client.status == STATUS.LOGGED:
@@ -29,7 +30,7 @@ class BrokerConnection:
 
     def logout(self):
         self.client.logout()
-        logger.debug('Close the Gate.')
+        logger.debug('Exchange logout')
 
 
 class DBConnections:
@@ -51,12 +52,12 @@ class DBConnections:
 
     def get_mongo(self):
         conn = self.get_connection(Mongo)
-        logger.debug(f'Connect conn: {conn}')
+        logger.debug(f'Got Mongo conn: {conn}')
         return conn
 
     def get_pg(self):
         conn = self.get_connection(Postgres)
-        logger.debug(f'Connect conn: {conn}')
+        logger.debug(f'Got Postgres conn: {conn}')
         return conn
 
     def close_all(self):

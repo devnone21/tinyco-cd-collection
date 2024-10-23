@@ -22,7 +22,7 @@ logging.config.dictConfig({
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'formatter': 'deafult',
             'filename': os.path.join(
-                os.path.dirname(__file__), 'logs/logfile.log'),
+                os.path.dirname(__file__), 'logfile.log'),
             'when': 'midnight',
             'backupCount': 3
         }

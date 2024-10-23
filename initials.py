@@ -1,13 +1,17 @@
+"""
+Initialize Spider service
+"""
 # import os
 import json
 from classes import Settings
+from base_loggers import logger
 from dotenv import load_dotenv
-
 load_dotenv()
+logger.service = __name__
 
 
-# Constant class
 class Const:
+    """Constant class"""
     MONGODB = 'xtb'
     PGDB = 'tinyco'
     SYMBOL_DEFAULT = (
@@ -69,4 +73,4 @@ accounts: dict = json.load(open('account.json'))
 settings = Settings(**json.load(open('settings.json')))
 
 if __name__ == '__main__':
-    print(settings)
+    logger.warning(str(settings))
